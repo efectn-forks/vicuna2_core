@@ -250,7 +250,11 @@ module vproc_pipeline import vproc_pkg::*; #(
             state_next.id                      = pipe_in_state_i.id;
             state_next.unit                    = pipe_in_state_i.unit;
             state_next.mode                    = pipe_in_state_i.mode;
-            state_next.eew                     = pipe_in_state_i.eew;
+            if (pipe_in_valid_i) begin
+                state_next.eew = pipe_in_state_i.eew;
+            end else begin
+                state_next.eew = state_q.eew;
+            end
             state_next.emul                    = pipe_in_state_i.emul;
             state_next.vxrm                    = pipe_in_state_i.vxrm;
             state_next.vl                      = pipe_in_state_i.vl;
