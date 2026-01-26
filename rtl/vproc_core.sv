@@ -464,6 +464,7 @@ module vproc_core import vproc_pkg::*; #(
         `else
         if (xif_commit_if.commit_valid & (instr_state_q[xif_commit_if.commit.id] != INSTR_INVALID)) begin
             result_empty_valid = instr_empty_res_q[xif_commit_if.commit.id];
+        end
         `endif   
         // Only instructions that have already been offloaded or are being offloaded right now
         // can be committed.  Commit transactions for invalid IDs are ignored. //CV32A6 can commit an instruction while offloading
