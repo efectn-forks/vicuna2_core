@@ -287,9 +287,24 @@ module vproc_decoder #(
                     end
                     2'b01,
                     2'b11: begin // indexed load/store
-                        mode_o.lsu.stride = LSU_INDEXED;
-                        rs2_o.vreg        = 1'b1;
-                        rs2_o.r.vaddr     = instr_vs2;
+
+                        // store data sew and lmul in alt signal
+                        // index sew and lmul are stored in eew and emul
+                        mode_o.lsu.stride            = LSU_INDEXED;
+                        mode_o.lsu.alt_eew           = vsew_i;
+                        rs2_o.vreg                   = 1'b1;
+                        rs2_o.r.vaddr                = instr_vs2;
+
+                        unique case (lmul_i)
+                            LMUL_F8,
+                            LMUL_F4,
+                            LMUL_F2,
+                            LMUL_1:  mode_o.lsu.alt_emul = EMUL_1;
+                            LMUL_2:  mode_o.lsu.alt_emul = EMUL_2;
+                            LMUL_4:  mode_o.lsu.alt_emul = EMUL_4;
+                            LMUL_8:  mode_o.lsu.alt_emul = EMUL_8;
+                            default: ;
+                        endcase
                     end
                     default: ;
                 endcase
@@ -2292,6 +2307,13 @@ module vproc_decoder #(
                 end
                 default: ;
             endcase
+            
+            if(mode_o.lsu.stride == LSU_INDEXED) begin
+                // vl does not need to be scaled since for indexed stride
+                // we use default sew and lmul
+            	vl_o = vl_i;
+            end
+            
         `ifdef RISCV_ZVE32F
 
         end else if (unit_o == UNIT_FPU) begin
@@ -2442,10 +2464,13 @@ module vproc_decoder #(
 
     // address masks (lower bits that must be 0) for registers based on EMUL:
     logic [2:0] regaddr_mask, regaddr_mask_narrow, regaddr_mask_narrow_x4;
+    logic [2:0] regaddr_mask_index_vd;
+
     always_comb begin
         regaddr_mask           = DONT_CARE_ZERO ? '0 : 'x;
         regaddr_mask_narrow    = DONT_CARE_ZERO ? '0 : 'x;
         regaddr_mask_narrow_x4 = DONT_CARE_ZERO ? '0 : 'x; //used for [s/z]ext.vf4
+        regaddr_mask_index_vd  = DONT_CARE_ZERO ? '0 : 'x;
         unique case (emul_o)
             EMUL_1: begin
                 regaddr_mask        = 3'b000;
@@ -2469,6 +2494,29 @@ module vproc_decoder #(
             end
             default: ;
         endcase
+
+        if(mode_o.lsu.stride == LSU_INDEXED) begin
+            // since for indexed stride we use the default lmul
+            // we need to adapt the mask 
+            unique case (lmul_i)
+                LMUL_F8,
+                LMUL_F4,
+                LMUL_F2,
+                LMUL_1: begin
+                    regaddr_mask_index_vd        = 3'b000;
+                end
+                LMUL_2: begin
+                    regaddr_mask_index_vd        = 3'b001;
+                end
+                LMUL_4: begin
+                    regaddr_mask_index_vd        = 3'b011;
+                end
+                LMUL_8: begin
+                    regaddr_mask_index_vd        = 3'b111;
+                end
+                default: ;
+            endcase
+        end
     end
 
     // check validity of register addresses:
@@ -2484,6 +2532,12 @@ module vproc_decoder #(
                 vs1_invalid = (instr_vs1 & {2'b00, regaddr_mask       }) != 5'b0;
                 vs2_invalid = (instr_vs2 & {2'b00, regaddr_mask       }) != 5'b0;
                 vd_invalid  = (instr_vd  & {2'b00, regaddr_mask       }) != 5'b0;
+
+                if(mode_o.lsu.stride == LSU_INDEXED) begin
+                    // since for indexed stride we use the default lmul
+                    // we use the adapted mask 
+                    vd_invalid  = (instr_vd  & {2'b00, regaddr_mask_index_vd       }) != 5'b0;
+                end
             end
             OP_WIDENING: begin
                 vs1_invalid = (instr_vs1 & {2'b00, regaddr_mask_narrow}) != 5'b0;
