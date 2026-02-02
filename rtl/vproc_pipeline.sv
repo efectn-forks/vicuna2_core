@@ -252,13 +252,18 @@ module vproc_pipeline import vproc_pkg::*; #(
             state_next.init_addr               = 1'b1;
             state_next.requires_flush          = pipe_in_state_i.requires_flush;
             state_next.id                      = pipe_in_state_i.id;
-            state_next.unit                    = pipe_in_state_i.unit;
             state_next.mode                    = pipe_in_state_i.mode;
+
+            // TODO: this block is needed for the unpack unit since
+            // it seems that signals do not stay valid long enough
             if (pipe_in_valid_i) begin
                 state_next.eew = pipe_in_state_i.eew;
+                state_next.unit  = pipe_in_state_i.unit;
             end else begin
                 state_next.eew = state_q.eew;
+                state_next.unit = state_q.unit;
             end
+            
             state_next.emul                    = pipe_in_state_i.emul;
             state_next.vxrm                    = pipe_in_state_i.vxrm;
             state_next.vl                      = pipe_in_state_i.vl;
@@ -1028,8 +1033,8 @@ module vproc_pipeline import vproc_pkg::*; #(
         .pipe_in_valid_i      ( unpack_valid                 ),
         .pipe_in_ready_o      ( unpack_ready                 ),
         .pipe_in_ctrl_i       ( unpack_ctrl                  ),
-        .pipe_in_alt_count_lsu_use_i( state_q.mode.lsu.alt_count_lsu_use    ),
-        .pipe_in_alt_eew_i    ( state_q.mode.lsu.alt_eew              ),
+        .pipe_in_unit_i       ( unpack_ctrl.unit             ),
+        .pipe_in_alt_eew_i    ( unpack_ctrl.mode.lsu.alt_eew ),
         .pipe_in_eew_i        ( unpack_ctrl.eew              ),
         .pipe_in_op_load_i    ( op_load                      ),
         .pipe_in_op_vaddr_i   ( op_vaddr                     ),
